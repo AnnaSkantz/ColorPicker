@@ -72,7 +72,7 @@
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="center"
-        android:background="@android:color/darker_gray"
+        android:background="@android:color/white"
         tools:ignore="MissingConstraints"
         tools:layout_editor_absoluteX="312dp"
         tools:layout_editor_absoluteY="616dp" />

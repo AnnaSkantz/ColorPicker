@@ -3,6 +3,7 @@ package com.example.colorroulette;
 import android.graphics.Color;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,25 +12,29 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.fragment.NavHostFragment;
 
 import com.example.colorroulette.databinding.FragmentSecondBinding;
 
 import java.io.IOException;
 import java.util.Random;
+import java.util.concurrent.Callable;
 
 public class SecondFragment extends Fragment {
 
     private FragmentSecondBinding binding;
     private View bgView = null;
-    private int currentColorIndex = 0;
+    private int currentColorIndex = -1;
     private int extraIterations = 0;
     private MediaPlayer mediaPlayerTick = null;
+    private MediaPlayer mediaPlayerCircus = null;
     private MediaPlayer mediaPlayerSong = null;
     private MediaPlayer mediaPlayerBoom = null;
     private boolean isColorMode = true;
     private int playerAScore = 0;
     private int playerBScore = 0;
     private int round = 0;
+    private boolean hasGivenPoints = false;
 
     private Handler handler = new Handler();
 
@@ -39,6 +44,7 @@ public class SecondFragment extends Fragment {
             Bundle savedInstanceState
     ) {
         mediaPlayerTick = MediaPlayer.create(getContext(), R.raw.tick);
+        mediaPlayerCircus = MediaPlayer.create(getContext(), R.raw.circus);
         mediaPlayerSong = MediaPlayer.create(getContext(), R.raw.pirates);
         mediaPlayerBoom = MediaPlayer.create(getContext(), R.raw.boom);
         binding = FragmentSecondBinding.inflate(inflater, container, false);
@@ -48,7 +54,11 @@ public class SecondFragment extends Fragment {
     public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         bgView = view;
+        resetGame();
         hideResults();
+        bgView.findViewById(R.id.playerAResultsText).setVisibility(View.GONE);
+        bgView.findViewById(R.id.playerBResultsText).setVisibility(View.GONE);
+        hasGivenPoints = false;
 
         binding.buttonColorMode.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -81,18 +91,30 @@ public class SecondFragment extends Fragment {
         binding.goButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View buttonView) {
+                if (!hasGivenPoints) {
+                    return;
+                }
+                hasGivenPoints = false;
+
+                if (round == 3) {
+                    NavHostFragment.findNavController(SecondFragment.this)
+                            .navigate(R.id.action_SecondFragment_to_FirstFragment);
+                    return;
+                }
                 hideResults();
-                bgView.setBackgroundColor(Color.BLACK);
                 iteration = 1;
+
                 if (isColorMode)
                     colorModeClick();
-                else
+                else {
+                    bgView.setBackgroundColor(Color.BLACK);
                     darkModeClick();
+                }
             }
         });
     }
 
-    private void colorModeClick(){
+    private void colorModeClick() {
         round++;
         bgView.findViewById(R.id.button_colorMode).setVisibility(View.GONE);
         bgView.findViewById(R.id.button_darkMode).setVisibility(View.GONE);
@@ -100,9 +122,11 @@ public class SecondFragment extends Fragment {
         iteration = 1;
         extraIterations = new Random().nextInt(20);
         handler.post(colorRunnable);
+        mediaPlayerCircus.start();
     }
 
-    private void darkModeClick(){
+    private void darkModeClick() {
+        bgView.setBackgroundColor(Color.BLACK);
         round++;
         bgView.findViewById(R.id.button_colorMode).setVisibility(View.GONE);
         bgView.findViewById(R.id.button_darkMode).setVisibility(View.GONE);
@@ -118,37 +142,53 @@ public class SecondFragment extends Fragment {
         binding = null;
     }
 
-    public int getRandomColor(){
+    public int getRandomColor() {
         int[] colors = {
-                Color.RED,
-                Color.GREEN,
-                Color.BLUE,
-                Color.GRAY,
-                Color.MAGENTA,
+                Color.rgb(237, 43, 88), // RED
+                Color.rgb(6, 214, 160), // GREEN
+                Color.rgb(17, 138, 178), // BLUE
+                Color.rgb(255, 209, 102) // YELLOW
         };
         int rnd = currentColorIndex;
         while (rnd == currentColorIndex)
             rnd = new Random().nextInt(colors.length);
+        currentColorIndex = rnd;
         return colors[rnd];
     }
 
     private void playerButtonClick(char player, View view) {
-        switch(player){
+        hasGivenPoints = true;
+        switch (player) {
             case 'A':
-                ((TextView) view.findViewById(R.id.playerAScoreText)).setText(Integer.toString(++playerBScore));
+                ((TextView) view.findViewById(R.id.playerAScoreText)).setText(Integer.toString(++playerAScore));
                 break;
             case 'B':
                 ((TextView) view.findViewById(R.id.playerBScoreText)).setText(Integer.toString(++playerBScore));
                 break;
         }
-        if (round == 3)
-            if (playerAScore > playerBScore) {
-                ((TextView) view.findViewById(R.id.playerAScoreText)).setText("You won!");
-                ((TextView) view.findViewById(R.id.playerBScoreText)).setText("You lost!");
-            } else {
-                ((TextView) view.findViewById(R.id.playerBScoreText)).setText("You won!");
-                ((TextView) view.findViewById(R.id.playerAScoreText)).setText("You lost!");
-            }
+        if (round == 3) {
+            startTimer(new Callable<Void>() {
+                public Void call() {
+                    showResultsText(view);
+                    return null;
+                }
+            }, 1000, 100);
+        }
+    }
+
+    private void showResultsText(View view) {
+        bgView.findViewById(R.id.playerAPlusBtn).setVisibility(View.GONE);
+        bgView.findViewById(R.id.playerBPlusBtn).setVisibility(View.GONE);
+
+        if (playerAScore > playerBScore) {
+            ((TextView) view.findViewById(R.id.playerAResultsText)).setText("You won!");
+            ((TextView) view.findViewById(R.id.playerBResultsText)).setText("You lost!");
+        } else {
+            ((TextView) view.findViewById(R.id.playerBResultsText)).setText("You won!");
+            ((TextView) view.findViewById(R.id.playerAResultsText)).setText("You lost!");
+        }
+        bgView.findViewById(R.id.playerAResultsText).setVisibility(View.VISIBLE);
+        bgView.findViewById(R.id.playerBResultsText).setVisibility(View.VISIBLE);
     }
 
     private int iteration = 1;
@@ -165,7 +205,18 @@ public class SecondFragment extends Fragment {
                     delay = 200;
                 handler.postDelayed(this, delay);
             } else {
-                showResults();
+                mediaPlayerCircus.stop();
+                try {
+                    mediaPlayerCircus.prepare();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                startTimer(new Callable<Void>() {
+                    public Void call() {
+                        showResults();
+                        return null;
+                    }
+                }, 3000, 100);
             }
             iteration++;
         }
@@ -179,9 +230,8 @@ public class SecondFragment extends Fragment {
             if (iteration <= 2) {
                 mediaPlayerSong.start();
                 handler.postDelayed(this, delay);
-            }
-            else {
-                mediaPlayerBoom.start();
+            } else {
+                handler.post(darkBoomRunnable);
                 mediaPlayerSong.stop();
                 try {
                     mediaPlayerSong.prepare();
@@ -189,12 +239,33 @@ public class SecondFragment extends Fragment {
                     e.printStackTrace();
                 }
                 bgView.setBackgroundColor(getRandomColor());
-                showResults();
+                startTimer(new Callable<Void>() {
+                    public Void call() {
+                        showResults();
+                        return null;
+                    }
+                }, 3000, 100);
             }
         }
     };
 
-    //TODO: Should have delay
+    void startTimer(Callable<Void> method, int msInFuture, int cdInterval) {
+        CountDownTimer cTimer = null;
+        cTimer = new CountDownTimer(msInFuture, cdInterval) {
+            public void onTick(long millisUntilFinished) {
+            }
+
+            public void onFinish() {
+                try {
+                    method.call();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        cTimer.start();
+    }
+
     private void showResults() {
         bgView.findViewById(R.id.playerAScoreText).setVisibility(View.VISIBLE);
         bgView.findViewById(R.id.playerBScoreText).setVisibility(View.VISIBLE);
@@ -210,5 +281,20 @@ public class SecondFragment extends Fragment {
         bgView.findViewById(R.id.playerBPlusBtn).setVisibility(View.GONE);
         bgView.findViewById(R.id.goButton).setVisibility(View.GONE);
     }
+
+    private void resetGame() {
+        round = 0;
+        playerAScore = 0;
+        playerBScore = 0;
+        ((TextView) bgView.findViewById(R.id.playerAScoreText)).setText(Integer.toString(0));
+        ((TextView) bgView.findViewById(R.id.playerBScoreText)).setText(Integer.toString(0));
+    }
+
+    Runnable darkBoomRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mediaPlayerBoom.start();
+        }
+    };
 
 }
